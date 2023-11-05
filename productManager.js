@@ -1,88 +1,73 @@
-class Product {
-  constructor({ id, title, description, price, thumbnail, code, stock }) {
-    this.id = id;
-    this.title = title;
-    this.description = description;
-    this.price = price;
-    this.thumbnail = thumbnail;
-    this.code = code;
-    this.stock = stock;
-  }
-}
+import { readFileSync, writeFileSync } from 'fs';
 
 class ProductManager {
-  ultimoID = 0;  
-
-  constructor({ products = [] }) {
-    this.products = products; // Ini lista de productos vacía
+  constructor({ dataFilePath }) {
+    this.dataFilePath = dataFilePath;
+    this.products = this.readProductsFromFile() || [];
   }
 
-  newID() {  // ID único increm > ultimoID
-    this.ultimoID++;
-    return this.ultimoID;
+  readProductsFromFile() {
+    try {
+      const data = readFileSync(this.dataFilePath, 'utf8');
+      return JSON.parse(data);
+    } catch (error) {
+      return [];
+    }
   }
 
-  addProduct({ title, description, price, thumbnail, code, stock }) {
+  writeProductsToFile() {
+    writeFileSync(this.dataFilePath, JSON.stringify(this.products, null, 2), 'utf8');
+  }
+
+  newID() {
+    return this.products.length ? Math.max(...this.products.map((product) => product.id)) + 1 : 1;
+  }
+
+  addProduct(productData) {
+    const { code } = productData;
     if (this.products.some((product) => product.code === code)) {
-      throw new Error("Ya existe un producto con el mismo código.");
+      throw new Error('Ya existe un producto con el mismo código.');
     }
 
-    const id = this.newID(); // nuevo ID.
-    const newProduct = new Product({ id, title, description, price, thumbnail, code, stock });
-    this.products.push(newProduct); // > nuevo producto a la lista.
-    return newProduct; // > producto agregado.
+    const id = this.newID();
+    const newProduct = { id, ...productData };
+    this.products.push(newProduct);
+    this.writeProductsToFile();
+    return newProduct;
   }
 
   getProducts() {
-    return this.products; // > lista de productos.
+    return this.products;
   }
 
   getProductById(id) {
     const product = this.products.find((product) => product.id === id);
     if (!product) {
-      throw new Error("Producto no encontrado.");
+      throw new Error('Producto no encontrado.');
     }
-    return product; // > producto p/ ID.
+    return product;
+  }
+
+  updateProduct(id, updatedFields) {
+    const productIndex = this.products.findIndex((product) => product.id === id);
+    if (productIndex === -1) {
+      throw new Error('Producto no encontrado.');
+    }
+
+    this.products[productIndex] = { ...this.products[productIndex], ...updatedFields };
+    this.writeProductsToFile();
+    return this.products[productIndex];
+  }
+
+  deleteProduct(id) {
+    const initialLength = this.products.length;
+    this.products = this.products.filter((product) => product.id !== id);
+    if (this.products.length === initialLength) {
+      throw new Error('Producto no encontrado.');
+    }
+
+    this.writeProductsToFile();
   }
 }
 
-const pm = new ProductManager({}); // instancia d ProductManager.
-console.log("Productos iniciales:", pm.getProducts());
-
-try {
-  const newProduct = pm.addProduct({
-    title: "producto prueba",
-    description: "Este es un producto prueba",
-    price: 200,
-    thumbnail: "Sin imagen",
-    code: "abc123",
-    stock: 25,
-  });
-  console.log("Producto agregado exitosamente:", newProduct);
-} catch (error) {
-  console.error("Error al agregar el producto:", error.message);
-}
-
-console.log("Productos después de agregar:", pm.getProducts());
-
-try {
-  pm.addProduct({
-    title: "producto repetido",
-    description: "Este es un producto repetido",
-    price: 300,
-    thumbnail: "Otra imagen",
-    code: "abc123", // Código repetido
-    stock: 10,
-  });
-  console.log("Producto agregado exitosamente.");
-} catch (error) {
-  console.error("Error al agregar el producto:", error.message);
-}
-
-try {
-  const productId = pm.getProducts()[0].id;
-  const foundProduct = pm.getProductById(productId);
-  console.log("Producto encontrado:", foundProduct);
-} catch (error) {
-  console.error("Error al obtener el producto por ID:", error.message);
-}
+export default ProductManager;
